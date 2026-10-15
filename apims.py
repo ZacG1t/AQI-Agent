@@ -36,7 +36,7 @@ async def run(playwright: Playwright):
 		rowData = await row.locator('td').all_text_contents()
 		rowInfo = []
 		for i in rowData: 
-			match = re.search(r"[a-zA-z0-9\w\s]+", i)
+			match = re.search(r"[a-zA-Z0-9\w\s]+", i)
 			text = match.group(0)
 			rowInfo.append(text) 
 		allInfo.append(rowInfo)
