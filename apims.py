@@ -2,11 +2,16 @@ import datetime
 import re
 import numpy as np 
 import pandas as pd 
+from pathlib import Path
 
 import asyncio
 from playwright.async_api import async_playwright, Playwright
 
 async def run(playwright: Playwright):
+	# Create directories. 
+	Path("screenshots").mkdir(exist_ok=True) 
+	Path("file").mkdir(exist_ok=True)
+
 	# Launch a browser. 
 	chromium = playwright.chromium
 	browser = await chromium.launch(headless=True) 
@@ -15,44 +20,70 @@ async def run(playwright: Playwright):
 	page = await browser.new_page()
 	await page.goto("https://eqms.doe.gov.my/APIMS/main")
 	
-	# Take a screenshot of EQMS homepage.
+	# Take a screenshot of APIMS homepage.
 	await page.screenshot(path="screenshots/APIMS-screenshot.jpg") 
 
-	# Filter Selangor. 
+	# Filter state. 
 	states = ["Selangor", "Negeri Sembilan", "Pulau Pinang"]
-	allInfo = []
+	all_info = []
+	expected_headers = None
 	for state in states:
-		await page.get_by_role("button", name="Filter").nth(1).click()
-		await page.get_by_role("radio", name=state).click()
-		await page.get_by_role("button", name="GENERATE").click() 
+		headers, rows = await scrape_state(page, state) 
 
-		# Take a screenshot of state API. 
-		now = datetime.datetime.now()
-		await page.screenshot(path=f"screenshots/{state}-API-{now.strftime('%Y%m%d_%H%M%S')}.png")
+		if expected_headers is None: 
+			expected_headers = headers 
+		elif headers != expected_headers: 
+			raise ValueError(f"Table columns changed for {state}")
 
-		# Get API table info. 
-		table = page.locator('table').nth(0)
-		header = await table.locator('th').all_text_contents()
-		rows = await table.locator('tbody tr').all() 
-		
-		for row in rows: 
-			rowData = await row.locator('td').all_text_contents()
-			rowInfo = []
-			for i in rowData: 
-				match = re.search(r"[a-zA-Z0-9\w\s]+", i)
-				text = match.group(0).title()
-				rowInfo.append(text) 
-			allInfo.append(rowInfo)
-		df = pd.DataFrame(allInfo, columns=header)
+		all_info.extend(rows) 
 
-	df.drop(columns="NO.", inplace=True)
-	df.to_csv(path_or_buf=f"file/Malaysia-API-{now.strftime('%Y%m%d_%H%M%S')}.csv", index=False)
+	# Save csv. 
+	now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") 
+	csv_path = f"file/Malaysia-API-{now}.csv" 
+
+	save_csv(expected_headers, all_info, csv_path)
 
 	# Close browser. 
 	await browser.close()
+
+
+async def scrape_state(page, state): 
+	filter_button = page.get_by_role("button", name="Filter").nth(1) 
+	await filter_button.click() 
+	await page.get_by_role("radio", name=state).click() 
+	await page.get_by_role("button", name="GENERATE").click() 
+
+	# Take a screenshot of state API. 
+	now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+	ss_path = f"screenshots/{state}-API-{now}.png"
+	await page.screenshot(path=ss_path)
+	
+	table = page.locator("table").first 
+	headers = await table.locator("th").all_text_contents()
+
+	rows = [] 
+	for row in await table.locator("tbody tr").all(): 
+		row_data = [cell.strip() for cell in await row.locator("td").all_text_contents()]
+		row_data[headers.index("LOCATION")] = row_data[headers.index("LOCATION")].title()
+		cells = await row.locator("td").all_text_contents() 
+		for cell in cells: 
+			match = re.search(r"[a-zA-Z0-9\w\s]+", cell) 
+			cell = match.group(0)
+		rows.append([cell.strip() for cell in cells]) 
+
+	return headers, rows
+
+
+def save_csv(headers, rows, path): 
+	df = pd.DataFrame(rows, columns=headers) 
+	df = df.drop(columns="NO.") 
+	df.to_csv(path_or_buf=path, index=False) 
+	print(f"File saved to {path}")
+
 
 async def main():
 	async with async_playwright() as playwright: 
 		await run(playwright)
 
-asyncio.run(main())
+if __name__ == "__main__": 
+	asyncio.run(main())
