@@ -19,29 +19,34 @@ async def run(playwright: Playwright):
 	await page.screenshot(path="screenshots/APIMS-screenshot.jpg") 
 
 	# Filter Selangor. 
-	await page.get_by_role("button", name="Filter").nth(1).click()
-	await page.get_by_role("radio", name="Selangor").click()
-	await page.get_by_role("button", name="GENERATE").click() 
-
-	# Take a screenshot of Selangor API. 
-	now = datetime.datetime.now()
-	await page.screenshot(path=f"screenshots/Selangor-API-{now.strftime('%Y%m%d_%H%M%S')}.png")
-
-	# Get API table info. 
-	table = page.locator('table').nth(0)
-	header = await table.locator('th').all_text_contents()
-	rows = await table.locator('tbody tr').all() 
+	states = ["Selangor", "Negeri Sembilan", "Pulau Pinang"]
 	allInfo = []
-	for row in rows: 
-		rowData = await row.locator('td').all_text_contents()
-		rowInfo = []
-		for i in rowData: 
-			match = re.search(r"[a-zA-Z0-9\w\s]+", i)
-			text = match.group(0)
-			rowInfo.append(text) 
-		allInfo.append(rowInfo)
-	df = pd.DataFrame(allInfo, columns=header)
-	df.to_csv(path_or_buf=f"file/Selangor-API-{now.strftime('%Y%m%d_%H%M%S')}.csv", index=False)
+	for state in states:
+		await page.get_by_role("button", name="Filter").nth(1).click()
+		await page.get_by_role("radio", name=state).click()
+		await page.get_by_role("button", name="GENERATE").click() 
+
+		# Take a screenshot of state API. 
+		now = datetime.datetime.now()
+		await page.screenshot(path=f"screenshots/{state}-API-{now.strftime('%Y%m%d_%H%M%S')}.png")
+
+		# Get API table info. 
+		table = page.locator('table').nth(0)
+		header = await table.locator('th').all_text_contents()
+		rows = await table.locator('tbody tr').all() 
+		
+		for row in rows: 
+			rowData = await row.locator('td').all_text_contents()
+			rowInfo = []
+			for i in rowData: 
+				match = re.search(r"[a-zA-Z0-9\w\s]+", i)
+				text = match.group(0).title()
+				rowInfo.append(text) 
+			allInfo.append(rowInfo)
+		df = pd.DataFrame(allInfo, columns=header)
+
+	df.drop(columns="NO.", inplace=True)
+	df.to_csv(path_or_buf=f"file/Malaysia-API-{now.strftime('%Y%m%d_%H%M%S')}.csv", index=False)
 
 	# Close browser. 
 	await browser.close()
