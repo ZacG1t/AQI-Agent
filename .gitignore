@@ -8,3 +8,5 @@ node_modules/
 /playwright/.auth/
 /screenshots/
 /file/
+iqair.py 
+testing.py
