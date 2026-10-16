@@ -33,6 +33,8 @@ async def run(playwright: Playwright):
 		if expected_headers is None: 
 			expected_headers = headers 
 		elif headers != expected_headers: 
+			print(f"Actual: {len(headers)} {headers}") 
+			print(f"Expected: {len(expected_headers)} {expected_headers}")
 			raise ValueError(f"Table columns changed for {state}")
 
 		all_info.extend(rows) 
@@ -60,16 +62,14 @@ async def scrape_state(page, state):
 	
 	table = page.locator("table").first 
 	headers = await table.locator("th").all_text_contents()
+	if headers[-1] == '': 
+		del headers[-1]
 
 	rows = [] 
 	for row in await table.locator("tbody tr").all(): 
 		row_data = [cell.strip() for cell in await row.locator("td").all_text_contents()]
-		row_data[headers.index("LOCATION")] = row_data[headers.index("LOCATION")].title()
-		cells = await row.locator("td").all_text_contents() 
-		for cell in cells: 
-			match = re.search(r"[a-zA-Z0-9\w\s]+", cell) 
-			cell = match.group(0)
-		rows.append([cell.strip() for cell in cells]) 
+		row_data[headers.index("LOCATION")] = row_data[headers.index("LOCATION")].title() 
+		rows.append(row_data)
 
 	return headers, rows
 
@@ -79,7 +79,6 @@ def save_csv(headers, rows, path):
 	df = df.drop(columns="NO.") 
 	df.to_csv(path_or_buf=path, index=False) 
 	print(f"File saved to {path}")
-
 
 async def main():
 	async with async_playwright() as playwright: 
