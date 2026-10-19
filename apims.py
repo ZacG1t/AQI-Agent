@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd 
 from pathlib import Path
 
+import sqlite3 
+from sqlalchemy import create_engine
+
 import asyncio
 from playwright.async_api import async_playwright, Playwright
 
@@ -58,7 +61,7 @@ async def scrape_state(page, state):
 	# Take a screenshot of state API. 
 	now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 	ss_path = f"screenshots/{state}-API-{now}.png"
-	await page.screenshot(path=ss_path)
+	# await page.screenshot(path=ss_path)
 	
 	table = page.locator("table").first 
 	headers = await table.locator("th").all_text_contents()
@@ -76,9 +79,25 @@ async def scrape_state(page, state):
 
 def save_csv(headers, rows, path): 
 	df = pd.DataFrame(rows, columns=headers) 
-	df = df.drop(columns="NO.") 
+	df = df.drop(columns="NO.")  
+	df = df.drop_duplicates(subset=["17:00"], keep="last")
 	df.to_csv(path_or_buf=path, index=False) 
-	print(f"File saved to {path}")
+	print(f"File saved to {path}") 
+
+	engine = create_engine("sqlite:///database/api.db") 
+	with engine.begin() as connection:
+		df.to_sql(name="api", con=engine, if_exists="append") 
+		print(f"API saved to db.") 
+
+"""
+def add_to_db(): 
+	con = sqlite3.connect("api.db") 
+	cur = con.cursor() 
+	cur.execute("CREATE TABLE api(State Location 9:00 10:00 11:00 12:00 13:00 14:00 15:00 16:00 17:00 18:00 19:00 20:00 21:00 22:00 23:00 0:00 1:00 2:00 3:00 4:00 5:00 6:00 7:00 8:00 9:00") 
+
+	res = cur.execute("SELECT api FROM sqlite_master") 
+	res.fetchone()
+"""
 
 async def main():
 	async with async_playwright() as playwright: 
