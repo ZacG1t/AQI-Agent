@@ -10,3 +10,4 @@ node_modules/
 /file/
 iqair.py 
 testing.py
+/database/api.db
