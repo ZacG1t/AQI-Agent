@@ -79,8 +79,7 @@ async def scrape_state(page, state):
 
 def save_csv(headers, rows, path): 
 	df = pd.DataFrame(rows, columns=headers) 
-	df = df.drop(columns="NO.")  
-	df = df.drop_duplicates(subset=["17:00"], keep="last")
+	df = df.drop(df.columns[[0, 3]], axis='columns')  
 	df.to_csv(path_or_buf=path, index=False) 
 	print(f"File saved to {path}") 
 
